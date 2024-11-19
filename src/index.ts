@@ -5,6 +5,7 @@ import { dirname } from 'path';
 import path from 'path';
 import fs from 'fs';
 import { Command } from "./types/command";
+import { helpComand } from "./commands/help";
 
 dotenv.config();
 
@@ -25,12 +26,41 @@ const __dirname = dirname(__filename);
 
 // Load commands from 'commands' folder
 const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.ts'));
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
+// for (const file of commandFiles) {
+//     const commandModule = await import(path.join(commandsPath, file)); // Destructure the exported command
+//     const pingCommand = commandModule.pingCommand;
+
+//     if (pingCommand) {
+//         client.commands.set(pingCommand.data.name, pingCommand); // Set the command in the client.commands collection
+//         commands.push(pingCommand.data); // Push the command to the commands array
+//     } else {
+//         console.error(`Failed to load command from file: ${file}`);
+//     }
+// }
+
+// Dynamically load commands from the 'commands' folder
 for (const file of commandFiles) {
-    const { pingCommand } = require(path.join(commandsPath, file)); // Destructure the exported command
-    client.commands.set(pingCommand.data.name, pingCommand); // Set the command in the client.commands collection
-    commands.push(pingCommand.data); // Push the command to the commands array
+    try {
+        // Dynamically import the command module
+        const commandModule = await import(path.join(commandsPath, file));
+
+        // Iterate through all exported properties of the module
+        for (const exportName in commandModule) {
+            const command = commandModule[exportName];
+
+            // Ensure the command has necessary data and execute properties
+            if (command?.data && command?.execute) {
+                client.commands.set(command.data.name, command); // Set the command in the client.commands collection
+                commands.push(command.data); // Push the command to the commands array
+            } else {
+                console.warn(`Export "${exportName}" in file "${file}" is not a valid command.`);
+            }
+        }
+    } catch (error) {
+        console.error(`Failed to load command from file: ${file}`, error);
+    }
 }
 
 // Register commands with Discord API (for all guilds for simplicity)
@@ -52,6 +82,15 @@ const rest = new REST({ version: '10' }).setToken(process.env.BOT_TOKEN!);
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user?.tag}`);
+});
+
+// Handle bot joins/leaves a server
+client.on('guildCreate', (guild) => {
+    console.log(`Joined a new server: ${guild.name} (ID: ${guild.id}).`);
+});
+
+client.on('guildDelete', (guild) => {
+    console.log(`Removed from server: ${guild.name} (ID: ${guild.id}).`);
 });
 
 client.on('interactionCreate', async (interaction) => {
