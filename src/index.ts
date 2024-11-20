@@ -28,18 +28,6 @@ const __dirname = dirname(__filename);
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-// for (const file of commandFiles) {
-//     const commandModule = await import(path.join(commandsPath, file)); // Destructure the exported command
-//     const pingCommand = commandModule.pingCommand;
-
-//     if (pingCommand) {
-//         client.commands.set(pingCommand.data.name, pingCommand); // Set the command in the client.commands collection
-//         commands.push(pingCommand.data); // Push the command to the commands array
-//     } else {
-//         console.error(`Failed to load command from file: ${file}`);
-//     }
-// }
-
 // Dynamically load commands from the 'commands' folder
 for (const file of commandFiles) {
     try {
@@ -99,11 +87,22 @@ client.on('interactionCreate', async (interaction) => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
+    // Log the invoked command details
+    console.log(`Command invoked: ${interaction.commandName}`);
+    console.log(`User: ${interaction.user.tag} (${interaction.user.id})`);
+    console.log(`Guild: ${interaction.guild?.name || 'Direct Message'} (${interaction.guild?.id || 'DM'})`);
+    console.log(`Options: ${JSON.stringify(interaction.options.data)}`);
+
     try {
         await command.execute(interaction); // Execute the command
+
     } catch (error) {
-        console.error(error);
-        await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+        console.error(`Error executing command ${interaction.commandName}:`, error);
+        
+        await interaction.reply({ 
+            content: 'There was an error while executing this command!', 
+            ephemeral: true 
+        });
     }
 });
 
