@@ -1,50 +1,91 @@
 import { SlashCommandBuilder } from "discord.js";
+import { createClient } from "@supabase/supabase-js";
 
-let tasks: { id: number; name: string; description: string; dueDate?: string; assignee?: string }[] = [];
-let taskIdCounter = 1;
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+// Ensure environment variables are defined
+if (!supabaseUrl || !supabaseKey) {
+    throw new Error("Missing Supabase URL or key in environment variables.");
+}
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// let tasks: { id: number; name: string; description: string; dueDate?: string; assignee?: string }[] = [];
+// let taskIdCounter = 1;
 
 export const taskCommand = {
     data: new SlashCommandBuilder()
         .setName("task")
         .setDescription("Manage tasks")
-        .addSubcommand(subcommand => 
+        .addSubcommand(subcommand =>
             subcommand
                 .setName("create")
                 .setDescription("Create a new task")
                 .addStringOption(option => 
-                    option.setName("name").setDescription("Task name").setRequired(true))
+                    option.setName("description")
+                        .setDescription("Task description")
+                        .setRequired(true))
                 .addStringOption(option =>
-                    option.setName("description").setDescription("Task description").setRequired(true))
-                .addStringOption(option =>
-                    option.setName("due_date").setDescription("Task due date (optional)").setRequired(false)))
+                    option.setName("assignee")
+                        .setDescription("The user to assign the task to")
+                        .setRequired(true)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName("list")
-                .setDescription("List all tasks")),
+                .setDescription("List your created tasks")),
     async execute(interaction: any) {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === "create") {
-            const name = interaction.options.getString("name");
             const description = interaction.options.getString("description");
-            const dueDate = interaction.options.getString("due_date");
+            const assignee = interaction.options.getUser("assignee");
+            const userId = interaction.user.id;
 
-            tasks.push({
-                id: taskIdCounter++,
-                name,
-                description,
-                dueDate,
-            });
+            // Insert task into Supabase
+            const { data, error } = await supabase
+                .from("tasks")
+                .insert({
+                    user_id: userId,
+                    description: description,
+                    assignee: assignee.id,
+                });
 
-            await interaction.reply(`Task "${name}" created successfully.`);
+            if (error) {
+                console.error("Error creating task:", error.message);
+                await interaction.reply({
+                    content: "Failed to create task. Please try again later.",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            await interaction.reply(`Task created and assigned to ${assignee.tag}: "${description}"`);
         } else if (subcommand === "list") {
-            if (tasks.length === 0) {
-                await interaction.reply("No tasks available.");
+            const userId = interaction.user.id;
+
+            // Retrieve tasks from Supabase
+            const { data: tasks, error } = await supabase
+                .from("tasks")
+                .select("*")
+                .eq("user_id", userId);
+
+            if (error) {
+                console.error("Error retrieving tasks:", error.message);
+                await interaction.reply({
+                    content: "Failed to retrieve tasks. Please try again later.",
+                    ephemeral: true,
+                });
+                return;
+            }
+
+            if (!tasks || tasks.length === 0) {
+                await interaction.reply("You have no tasks.");
             } else {
                 const taskList = tasks.map(task => 
-                    `**${task.id}**: ${task.name} - ${task.description} ${task.dueDate ? `(Due: ${task.dueDate})` : ""}`).join("\n");
-
-                await interaction.reply(`**Tasks:**\n${taskList}`);
+                    `**${task.id}**: ${task.description} (Assigned to: <@${task.assignee}>)`).join("\n");
+                
+                await interaction.reply(`**Your tasks:**\n${taskList}`);
             }
         }
     },
