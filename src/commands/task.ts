@@ -1,15 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { createClient } from "@supabase/supabase-js";
-
-// Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
-
-// Ensure environment variables are defined
-if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing Supabase URL or key in environment variables.");
-}
-const supabase = createClient(supabaseUrl, supabaseKey);
+import supabase from "../database/supabaseClient.js";
 
 // let tasks: { id: number; name: string; description: string; dueDate?: string; assignee?: string }[] = [];
 // let taskIdCounter = 1;
