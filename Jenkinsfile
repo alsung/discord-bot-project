@@ -1,5 +1,11 @@
 pipeline {
     agent any
+
+    // tools {
+    //     // Ensure the correct Node.js version is used in the pipeline
+    //     nodejs 'NodeJS-22'
+    // }
+
     stages {
         stage('Checkout') {
             steps {
@@ -13,6 +19,7 @@ pipeline {
         }
         stage('Lint') {
             steps {
+                sh 'node -v'
                 sh 'npm run lint'
             }
         }
